@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Art Crowdfund</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+</head>
+<body>
+<h2>Crowdfunded Art Project</h2>
+<button id="connect">Connect Wallet</button>
+<p>Goal: <span id="goal">-</span> ETH</p>
+<p>Raised: <span id="raised">-</span> ETH</p>
+<p>My support: <span id="mine">-</span> ETH</p>
+<p>Status: <span id="status">-</span></p>
+
+<input id="amount" type="text" placeholder="Amount in ETH">
+<button id="contribute">Contribute</button>
+<p id="msg"></p>
+
+<script>
+const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+const ABI = [
+  "function contributeArtFund() payable",
+  "function getRaisedAmount() view returns (uint256)",
+  "function getMySupport() view returns (uint256)",
+  "function getGoal() view returns (uint256)",
+  "function isOpen() view returns (bool)"
+];
+
+async function connect() {
+  const msg = document.getElementById("msg");
+  try {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    const signer = await provider.getSigner();
+    const code = await provider.getCode(CONTRACT_ADDRESS);
+    if (code === "0x") {
+      msg.textContent = "No contract at this address. Redeploy and update CONTRACT_ADDRESS";
+      return;
+    }
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    await refresh();
+    msg.textContent = "Connected: " + (await signer.getAddress());
+  } catch (e) {
+    msg.textContent = "Error: " + (e.reason || e.message);
+  }
+}
+
+async function refresh() {
+  document.getElementById("goal").textContent = ethers.formatEther(await contract.getGoal());
+  document.getElementById("raised").textContent = ethers.formatEther(await contract.getRaisedAmount());
+  document.getElementById("mine").textContent = ethers.formatEther(await contract.getMySupport());
+  document.getElementById("status").textContent = (await contract.isOpen()) ? "Open" : "Closed";
+}
+
+async function contribute() {
+  const msg = document.getElementById("msg");
+  try {
+    const value = ethers.parseEther(document.getElementById("amount").value);
+    const tx = await contract.contributeArtFund({ value });
+    msg.textContent = "Pending...";
+    await tx.wait();
+    msg.textContent = "Contribution confirmed";
+    await refresh();
+  } catch (e) {
+    msg.textContent = "Error: " + (e.reason || e.message);
+  }
+}
+
+document.getElementById("connect").onclick = connect;
+document.getElementById("contribute").onclick = contribute;
+</script>
+</body>
+</html>
